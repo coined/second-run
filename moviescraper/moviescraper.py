@@ -9,9 +9,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class MovieSite:
-    def __init__(self):
-        self.site_url = "http://example.com"
-        self.theater_name = "Example Theater"
+    def __init__(self, site_url = None, theater_name = None, section_selector = None,
+            list_selector = None, title_strip_regex = None
+        ):
+        self.site_url = site_url
+        self.theater_name = theater_name
+        self.section_selector = section_selector
+        self.list_selector = list_selector
+        self.title_strip_regex = title_strip_regex
         self.movie_list = ([])
         self.movie_filter = ([])
 
@@ -51,8 +56,26 @@ class MovieSite:
         ))
 
     def generate_movie_list(self, soup):
-        pass
+        section_selector = [ "div", { "class" : "movieListingMargins" } ]
+        movie_section = soup.find(self.section_selector)
+        list_selector = 'span.movieListing_title > a'
+        movie_list = movie_section.select(self.list_selector)
+        title_strip_regex = r'^\W+'
+        movies = [re.sub(self.title_strip_regex, '', movie.string) for movie in movie_list]
+        return movies
 
+
+class Theaters:
+    def __init__(self):
+        laurelhurst_theater = MovieSite(
+            site_url = 'http://laurelhursttheater.com/', theater_name = 'Laurelhurst',
+            section_selector = [ "div", { "class" : "movieListingMargins" } ],
+            list_selector = 'span.movieListing_title > a', title_strip_regex = r'^\W+'
+        )
+        self.theaters = [ laurelhurst_theater ]
+
+    def theater_list(self):
+        return self.theaters
 
 class LaurelhurstSite(MovieSite):
     def __init__(self):
@@ -61,10 +84,12 @@ class LaurelhurstSite(MovieSite):
         self.theater_name = "Laurelhurst"
 
     def generate_movie_list(self, soup):
-        movie_section = soup.find("div", { "class" : "movieListingMargins" })
-        movies = [re.sub(r'^\W+', '', movie.a.string) for movie in movie_section.find_all(
-            "span", {"class" : "movieListing_title"}
-        )]
+        section_selector = [ "div", { "class" : "movieListingMargins" } ]
+        movie_section = soup.find(section_selector)
+        list_selector = 'span.movieListing_title > a'
+        movie_list = movie_section.select(list_selector)
+        title_strip_regex = r'^\W+'
+        movies = [re.sub(title_strip_regex, '', movie.string) for movie in movie_list]
         return movies
 
 
@@ -130,17 +155,17 @@ class MorelandTheater(MovieSite):
         movies = [movie.string for movie in movie_section.find_all("h3", {"class" : "title"})]
         return movies
 
-class Theaters:
-    def __init__(self):
-        self.theaters = [
-                LaurelhurstSite(),
-                LakeTheaterSite(),
-                AcademyTheaterSite(),
-                LivingRoomTheatersSite(),
-                MilwaukieWunderlandCinema(),
-                MorelandTheater()
-            ]
-
-    def theater_list(self):
-        return self.theaters
+# class Theaters:
+#     def __init__(self):
+#         self.theaters = [
+#                 LaurelhurstSite(),
+#                 #LakeTheaterSite(),
+#                 #AcademyTheaterSite(),
+#                 #LivingRoomTheatersSite(),
+#                 #MilwaukieWunderlandCinema(),
+#                 #MorelandTheater()
+#             ]
+# 
+#     def theater_list(self):
+#         return self.theaters
 
