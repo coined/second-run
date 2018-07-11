@@ -27,10 +27,8 @@ logger = logging.getLogger(__name__)
 def main():
     user_movies = _create_filter()
     logging.debug('>>> main(): Created filter')
-    test_theater = moviescraper.LaurelhurstSite()
-    logging.debug('>>> main(): Created test theater "{}"'.format(test_theater))
     theaters = moviescraper.Theaters()
-    logging.debug('>>> main(): Created theater list "{}"'.format(test_theater))
+    logging.debug('>>> main(): Using default theater list "{}"'.format(theaters))
 
     movie_list = {}
 
@@ -40,13 +38,13 @@ def main():
         theater.movie_filter = user_movies.movies()
         logging.debug('Got movie filter {}'.format(theater.movie_filter))
         if len(theater.movies()) == 0:
-            logging.debug('{} returned no movies.'.format(theater.theater_name))
+            logging.debug('{} returned 0 movies.'.format(theater.theater_name))
         else:
             for movie in theater.movies():
                 logging.debug('Starting movie {} for theater {}'.format(movie, theater.theater_name))
                 if movie in movie_list:
                     movie_list[movie].append(theater.theater_name)
-                    logging.debug('\tAdded {} to {}, user_movies is now {}'.format(
+                    logging.debug('Added {} to {}, user_movies is now {}'.format(
                         movie, theater.theater_name, user_movies.movies())
                     )
                 else:

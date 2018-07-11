@@ -9,14 +9,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class MovieSite:
-    def __init__(self, site_url = None, theater_name = None, section_selector = None,
-            list_selector = None, title_strip_regex = None
-        ):
+    def __init__(self, site_url = None, theater_name = None, list_selector = None, text_search = None):
         self.site_url = site_url
         self.theater_name = theater_name
-        self.section_selector = section_selector
         self.list_selector = list_selector
-        self.title_strip_regex = title_strip_regex
+        self.text_search = text_search
         self.movie_list = ([])
         self.movie_filter = ([])
 
@@ -25,43 +22,55 @@ class MovieSite:
     
     def movies(self):
         # Only generate list if we haven't already done so
+        # Doesn't currently handle cases where we have already done so but got 0 movies
         logging.debug('Existing movie_list has {} elements'.format(len(list(self.movie_list))))
         if len(list(self.movie_list)) == 0:
             logging.info('Generating movie list for {}'.format(self.theater_name))
             soup = BeautifulSoup(requests.get(self.site_url).text, 'html.parser')
             try:
-                self.movie_list = set(self.generate_movie_list(soup))
-            # Trap errors due to a mismatch between our expectations and the actual site structure
+                self.movie_list = set(self._generate_movie_list(soup))
             except (AttributeError, IndexError):
                 logging.error('{} returned no movies -- check configuration.'.format(self.theater_name))
                 self.movie_list = []
             logging.debug('Got movie list: {}'.format(self.movie_list))
             if len(self.movie_filter) > 0:
                 logging.info('Applying user filter to movie list for {}'.format(self.theater_name))
-                self.movie_list = self.filter_movie_list(self.movie_list, self.movie_filter)
+                self.movie_list = self._filter_movie_list(self.movie_list, self.movie_filter)
                 logging.debug('Filtered to {}'.format(self.movie_list))
             else:
                 logging.info('No user filter found during {} generation'.format(self.theater_name))
-            self.movie_list = sorted(map(str.strip, self.movie_list))
+            self.movie_list = sorted(self._strip_movie_titles(self.movie_list))
         else:
             logging.debug('Skipping movie list generation for {} because we already have it'.format(self.theater_name))
         logging.debug('Completed movies() method for {}, filter is now {}'.format(self.theater_name, self.movie_filter))
         return self.movie_list
 
-    def filter_movie_list(self, movie_list, movie_filter):
+    def _strip_movie_titles(self, movie_titles):
+        # Could do multiple regexes in one pass but let's start simple
+        logging.debug('Stripping titles: {}'.format(movie_titles))
+        movie_titles = [re.sub(r'^\W+', '', title) for title in movie_titles]
+        movie_titles = [re.sub(r' //.*', '', title) for title in movie_titles]
+        movie_titles = [re.sub('’', '\'', title) for title in movie_titles]
+        logging.debug('Stripped titles: {}'.format(movie_titles))
+        return movie_titles
+
+    def _filter_movie_list(self, movie_list, movie_filter):
         logging.debug('Movie list is {}'.format(movie_list))
         logging.debug('User filter is {}'.format(movie_filter))
         return list(filter(
             (lambda x: any(filter_string in x for filter_string in movie_filter)), movie_list
         ))
 
-    def generate_movie_list(self, soup):
-        section_selector = [ "div", { "class" : "movieListingMargins" } ]
-        movie_section = soup.find(self.section_selector)
-        list_selector = 'span.movieListing_title > a'
-        movie_list = movie_section.select(self.list_selector)
-        title_strip_regex = r'^\W+'
-        movies = [re.sub(self.title_strip_regex, '', movie.string) for movie in movie_list]
+    def _generate_movie_list(self, soup):
+        logging.debug('Using list_selector {} for URL {}'.format(self.list_selector, self.site_url))
+        movie_list = soup.select(self.list_selector)
+        logging.debug('Resulting data is {}'.format(movie_list))
+        if len(movie_list) == 0:
+            return []
+        if self.text_search:
+            movies = re.search(self.text_search, str(movie_list)).group(1).split(', ')
+        else:
+            movies = [movie.string for movie in movie_list]
         return movies
 
 
@@ -69,28 +78,32 @@ class Theaters:
     def __init__(self):
         laurelhurst_theater = MovieSite(
             site_url = 'http://laurelhursttheater.com/', theater_name = 'Laurelhurst',
-            section_selector = [ "div", { "class" : "movieListingMargins" } ],
-            list_selector = 'span.movieListing_title > a', title_strip_regex = r'^\W+'
+            list_selector = 'div.movieListing_titleContainer > span.movieListing_title > a'
         )
-        self.theaters = [ laurelhurst_theater ]
+        lake_theater = MovieSite(
+            site_url = 'http://laketheatercafe.com/', theater_name = 'Lake Theater',
+            list_selector = 'section#nowplaying > div.section-inner > div.section-content > p > span',
+            text_search = 'Now Playing: (.+)$'
+        )
+        self.theaters = [ laurelhurst_theater, lake_theater ]
 
     def theater_list(self):
         return self.theaters
 
-class LaurelhurstSite(MovieSite):
-    def __init__(self):
-        super(LaurelhurstSite, self).__init__()
-        self.site_url = 'http://laurelhursttheater.com/'
-        self.theater_name = "Laurelhurst"
-
-    def generate_movie_list(self, soup):
-        section_selector = [ "div", { "class" : "movieListingMargins" } ]
-        movie_section = soup.find(section_selector)
-        list_selector = 'span.movieListing_title > a'
-        movie_list = movie_section.select(list_selector)
-        title_strip_regex = r'^\W+'
-        movies = [re.sub(title_strip_regex, '', movie.string) for movie in movie_list]
-        return movies
+# class LaurelhurstSite(MovieSite):
+#     def __init__(self):
+#         super(LaurelhurstSite, self).__init__()
+#         self.site_url = 'http://laurelhursttheater.com/'
+#         self.theater_name = "Laurelhurst"
+#
+#     def generate_movie_list(self, soup):
+#         section_selector = [ "div", { "class" : "movieListingMargins" } ]
+#         movie_section = soup.find(section_selector)
+#         list_selector = 'span.movieListing_title > a'
+#         movie_list = movie_section.select(list_selector)
+#         title_strip_regex = r'^\W+'
+#         movies = [re.sub(title_strip_regex, '', movie.string) for movie in movie_list]
+#         return movies
 
 
 class LakeTheaterSite(MovieSite):
