@@ -30,7 +30,7 @@ class MovieSite:
             try:
                 self.movie_list = set(self._generate_movie_list(soup))
             except (AttributeError, IndexError):
-                logging.error('{} returned no movies -- check configuration.'.format(self.theater_name))
+                logging.error('Error retrieving data for {} -- check configuration.'.format(self.theater_name))
                 self.movie_list = []
             logging.debug('Got movie list: {}'.format(self.movie_list))
             if len(self.movie_filter) > 0:
@@ -39,7 +39,13 @@ class MovieSite:
                 logging.debug('Filtered to {}'.format(self.movie_list))
             else:
                 logging.info('No user filter found during {} generation'.format(self.theater_name))
-            self.movie_list = sorted(self._strip_movie_titles(self.movie_list))
+            logging.debug('Returning list is type {}, value {}'.format(type(self.movie_list), self.movie_list))
+            if self.movie_list == {None}:
+                logging.debug('Movie list is "None", setting to []')
+                self.movie_list = []
+            else:
+                logging.debug('Movie list is {}, stripping titles'.format(self.movie_list))
+                self.movie_list = sorted(self._strip_movie_titles(self.movie_list))
         else:
             logging.debug('Skipping movie list generation for {} because we already have it'.format(self.theater_name))
         logging.debug('Completed movies() method for {}, filter is now {}'.format(self.theater_name, self.movie_filter))
@@ -49,6 +55,7 @@ class MovieSite:
         # Could do multiple regexes in one pass but let's start simple
         logging.debug('Stripping titles: {}'.format(movie_titles))
         movie_titles = [re.sub(r'^\W+', '', title) for title in movie_titles]
+        movie_titles = [re.sub(r'\W+$', '', title) for title in movie_titles]
         movie_titles = [re.sub(r' //.*', '', title) for title in movie_titles]
         movie_titles = [re.sub('’', '\'', title) for title in movie_titles]
         logging.debug('Stripped titles: {}'.format(movie_titles))
@@ -65,12 +72,12 @@ class MovieSite:
         logging.debug('Using list_selector {} for URL {}'.format(self.list_selector, self.site_url))
         movie_list = soup.select(self.list_selector)
         logging.debug('Resulting data is {}'.format(movie_list))
-        if len(movie_list) == 0:
-            return []
         if self.text_search:
+            logging.debug('Applying custom text search {}'.format(self.text_search))
             movies = re.search(self.text_search, str(movie_list)).group(1).split(', ')
         else:
             movies = [movie.string for movie in movie_list]
+            logging.debug('Returning generated list {}'.format(movies))
         return movies
 
 
@@ -85,100 +92,26 @@ class Theaters:
             list_selector = 'section#nowplaying > div.section-inner > div.section-content > p > span',
             text_search = 'Now Playing: (.+)$'
         )
-        self.theaters = [ laurelhurst_theater, lake_theater ]
+        academy_theater = MovieSite(
+            site_url = 'http://www.academytheaterpdx.com/', theater_name = 'Academy Theater',
+            list_selector = 'div.now_playing > section.board > ul > li > a'
+        )
+        livingroom_theater = MovieSite(
+            site_url = 'http://pdx.livingroomtheaters.com/', theater_name = 'Living Room Theaters',
+            list_selector = 'ul.movie_titles > li > a'
+        )
+        wunderland_theater = MovieSite(
+            site_url = 'http://www.wunderlandgames.com/gettimes.asp?house=3054',
+            theater_name = 'Milwaukie Wunderland Cinema', list_selector = 'a.a1title > b'
+        )
+        moreland_theater = MovieSite(
+            site_url = 'https://ticketing.us.veezi.com/sessions/?siteToken=v0v9bscth4zdgv6ezczt5ecsjm',
+            theater_name = 'Moreland Theater',
+            list_selector = 'div#sessionsByFilmConent > div.film > div > h3.title'
+        )
+        self.theaters = [ laurelhurst_theater, lake_theater, academy_theater, 
+                livingroom_theater, wunderland_theater, moreland_theater ]
 
     def theater_list(self):
         return self.theaters
-
-# class LaurelhurstSite(MovieSite):
-#     def __init__(self):
-#         super(LaurelhurstSite, self).__init__()
-#         self.site_url = 'http://laurelhursttheater.com/'
-#         self.theater_name = "Laurelhurst"
-#
-#     def generate_movie_list(self, soup):
-#         section_selector = [ "div", { "class" : "movieListingMargins" } ]
-#         movie_section = soup.find(section_selector)
-#         list_selector = 'span.movieListing_title > a'
-#         movie_list = movie_section.select(list_selector)
-#         title_strip_regex = r'^\W+'
-#         movies = [re.sub(title_strip_regex, '', movie.string) for movie in movie_list]
-#         return movies
-
-
-class LakeTheaterSite(MovieSite):
-    def __init__(self):
-        super(LakeTheaterSite, self).__init__()
-        self.site_url = 'http://laketheatercafe.com/'
-        self.theater_name = "Lake Theater"
-
-    def generate_movie_list(self, soup):
-        movie_section = soup.find("section", { "id" : "nowplaying" }).div.div.p.span.string
-        movie_list = [re.sub('’', '\'', re.sub(r' //.*', '', movie)) for movie in re.search(
-            'Now Playing: (.+)$', movie_section
-        ).group(1).split(', ')]
-        return movie_list
-
-
-class AcademyTheaterSite(MovieSite):
-    def __init__(self):
-        super(AcademyTheaterSite, self).__init__()
-        self.site_url = 'http://www.academytheaterpdx.com/'
-        self.theater_name = "Academy Theater"
-
-    def generate_movie_list(self, soup):
-        movie_section = soup.find("div", { "class" : "now_playing" }).section.ul
-        movies = [movie.a.string for movie in movie_section.find_all("li") if 'post_type=movie' in movie.a.get('href')]
-        return movies
-
-
-class LivingRoomTheatersSite(MovieSite):
-    def __init__(self):
-        super(LivingRoomTheatersSite, self).__init__()
-        self.site_url = 'http://pdx.livingroomtheaters.com/'
-        self.theater_name = "Living Room Theaters"
-
-    def generate_movie_list(self, soup):
-        movie_section = soup.find("ul", { "class" : "movie_titles" })
-        movies = [movie.a.string for movie in movie_section.find_all("li") if movie.a and 'movie_detail' in movie.a.get('href')]
-        return movies
-
-
-class MilwaukieWunderlandCinema(MovieSite):
-    def __init__(self):
-        super(MilwaukieWunderlandCinema, self).__init__()
-        self.site_url = 'http://www.wunderlandgames.com/gettimes.asp?house=3054'
-        self.theater_name = "Milwaukie Wunderland Cinema"
-
-    def generate_movie_list(self, soup):
-        movie_section = soup.find("table", { "class" : "a1table" })
-        movies = [movie.b.string for movie in movie_section.find_all("a") if movie['class'] == ['a1title']]
-        return movies
-
-
-class MorelandTheater(MovieSite):
-    def __init__(self):
-        super(MorelandTheater, self).__init__()
-        self.site_url = 'https://ticketing.us.veezi.com/sessions/?siteToken=v0v9bscth4zdgv6ezczt5ecsjm'
-        self.theater_name = "Moreland Theater"
-
-    def generate_movie_list(self, soup):
-        # Yes, it's "conent"
-        movie_section = soup.find("div", { "id" : "sessionsByFilmConent" })
-        movies = [movie.string for movie in movie_section.find_all("h3", {"class" : "title"})]
-        return movies
-
-# class Theaters:
-#     def __init__(self):
-#         self.theaters = [
-#                 LaurelhurstSite(),
-#                 #LakeTheaterSite(),
-#                 #AcademyTheaterSite(),
-#                 #LivingRoomTheatersSite(),
-#                 #MilwaukieWunderlandCinema(),
-#                 #MorelandTheater()
-#             ]
-# 
-#     def theater_list(self):
-#         return self.theaters
 
