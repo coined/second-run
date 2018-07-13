@@ -1,9 +1,6 @@
 #!/usr/local/bin/python3
 
-import pickle
 import re
-import requests
-from bs4 import BeautifulSoup
 from moviescraper import moviescraper
 import logging
 logging.basicConfig(level=logging.INFO)

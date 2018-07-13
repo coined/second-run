@@ -1,6 +1,5 @@
 #!/usr/local/bin/python3
 
-import pickle
 import re
 import requests
 from bs4 import BeautifulSoup
@@ -57,7 +56,7 @@ class MovieSite:
         movie_titles = [re.sub(r'^\W+', '', title) for title in movie_titles]
         movie_titles = [re.sub(r'\W+$', '', title) for title in movie_titles]
         movie_titles = [re.sub(r' //.*', '', title) for title in movie_titles]
-        movie_titles = [re.sub('’', '\'', title) for title in movie_titles]
+        movie_titles = [re.sub(u"\u2019", '\'', title) for title in movie_titles]
         logging.debug('Stripped titles: {}'.format(movie_titles))
         return movie_titles
 
