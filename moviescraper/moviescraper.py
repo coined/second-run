@@ -71,12 +71,12 @@ class MovieSite:
         logging.debug('Using list_selector {} for URL {}'.format(self.list_selector, self.site_url))
         movie_list = soup.select(self.list_selector)
         logging.debug('Resulting data is {}'.format(movie_list))
-        if self.text_search:
-            logging.debug('Applying custom text search {}'.format(self.text_search))
-            movies = re.search(self.text_search, str(movie_list)).group(1).split(', ')
-        else:
+        if self.text_search is None:
             movies = [movie.string for movie in movie_list]
             logging.debug('Returning generated list {}'.format(movies))
+        else:
+            logging.debug('Applying custom text search {}'.format(self.text_search))
+            movies = re.search(self.text_search, str(movie_list)).group(1).split(', ')
         return movies
 
 
