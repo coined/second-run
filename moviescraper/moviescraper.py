@@ -22,7 +22,6 @@ class MovieSite:
     def movies(self):
         # Only generate list if we haven't already done so
         # Doesn't currently handle cases where we have already done so but got 0 movies
-        logging.debug('Existing movie_list has {} elements'.format(len(list(self.movie_list))))
         if len(list(self.movie_list)) == 0:
             logging.info('Generating movie list for {}'.format(self.theater_name))
             soup = BeautifulSoup(requests.get(self.site_url).text, 'html.parser')
@@ -32,12 +31,14 @@ class MovieSite:
                 logging.error('Error retrieving data for {} -- check configuration.'.format(self.theater_name))
                 self.movie_list = []
             logging.debug('Got movie list: {}'.format(self.movie_list))
+
             if len(self.movie_filter) > 0:
                 logging.info('Applying user filter to movie list for {}'.format(self.theater_name))
                 self.movie_list = self._filter_movie_list(self.movie_list, self.movie_filter)
                 logging.debug('Filtered to {}'.format(self.movie_list))
             else:
                 logging.info('No user filter found during {} generation'.format(self.theater_name))
+
             logging.debug('Returning list is type {}, value {}'.format(type(self.movie_list), self.movie_list))
             if self.movie_list == {None}:
                 logging.debug('Movie list is "None", setting to []')
@@ -61,6 +62,7 @@ class MovieSite:
         return movie_titles
 
     def _filter_movie_list(self, movie_list, movie_filter):
+        # It would be more efficient to apply this only once after retrieving from all theaters
         logging.debug('Movie list is {}'.format(movie_list))
         logging.debug('User filter is {}'.format(movie_filter))
         return list(filter(
@@ -70,13 +72,13 @@ class MovieSite:
     def _generate_movie_list(self, soup):
         logging.debug('Using list_selector {} for URL {}'.format(self.list_selector, self.site_url))
         movie_list = soup.select(self.list_selector)
-        logging.debug('Resulting data is {}'.format(movie_list))
-        if self.text_search is None:
-            movies = [movie.string for movie in movie_list]
-            logging.debug('Returning generated list {}'.format(movies))
-        else:
+        logging.debug('Selected data from soup.select() is {}'.format(movie_list))
+        movies = [movie.string for movie in movie_list]
+        logging.debug('Movie strings are {}'.format(movies))
+        if self.text_search is not None:
+            # Special case to handle multiple movies in one text string
             logging.debug('Applying custom text search {}'.format(self.text_search))
-            movies = re.search(self.text_search, str(movie_list)).group(1).split(', ')
+            movies = re.search(self.text_search, ', '.join(movies)).group(1).split(', ')
         return movies
 
 

@@ -61,5 +61,13 @@ class TestMovieSite(unittest.TestCase):
         movie_list = self.test_theater._generate_movie_list(soup)
         self.assertEqual(movie_list, ['Test Movie', 'Test Movie Two'])
 
+    def test_generate_movie_list_with_text_search(self):
+        soup = BeautifulSoup('<html><body><div class="test_1"><div id="test_2">\
+                <span>Awesome Movies: Test Movie, Test Movie Two</span>\
+                </div></div></body></html>', 'html.parser')
+        self.test_theater.text_search = 'Awesome Movies: (.+)'
+        movie_list = self.test_theater._generate_movie_list(soup)
+        self.assertEqual(movie_list, ['Test Movie', 'Test Movie Two'])
+
 if __name__ == '__main__':
     unittest.main()
