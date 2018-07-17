@@ -19,14 +19,24 @@ class MovieSite:
     def __str__(self):
         return "\n".join(['    {}'.format(movie) for movie in self.movies()])
     
+    def _get_soup(self):
+        # Broken out to simplify testing
+        if self.site_url.startswith('http'):
+            logging.debug('Getting soup for URL {}'.format(self.site_url))
+            soup = BeautifulSoup(requests.get(self.site_url).text, 'html.parser')
+        else:
+            logging.debug('Getting soup for file path {}'.format(self.site_url))
+            with open(self.site_url) as html_file:
+                soup = BeautifulSoup(html_file, 'html.parser')
+        return soup
+
     def movies(self):
         # Only generate list if we haven't already done so
         # Doesn't currently handle cases where we have already done so but got 0 movies
         if len(list(self.movie_list)) == 0:
             logging.info('Generating movie list for {}'.format(self.theater_name))
-            soup = BeautifulSoup(requests.get(self.site_url).text, 'html.parser')
             try:
-                self.movie_list = set(self._generate_movie_list(soup))
+                self.movie_list = set(self._generate_movie_list())
             except (AttributeError, IndexError):
                 logging.error('Error retrieving data for {} -- check configuration.'.format(self.theater_name))
                 self.movie_list = []
@@ -69,8 +79,10 @@ class MovieSite:
             (lambda x: any(filter_string in x for filter_string in movie_filter)), movie_list
         ))
 
-    def _generate_movie_list(self, soup):
+    def _generate_movie_list(self):
         logging.debug('Using list_selector {} for URL {}'.format(self.list_selector, self.site_url))
+        soup = self._get_soup()
+        logging.debug('Got soup: {}'.format(soup))
         movie_list = soup.select(self.list_selector)
         logging.debug('Selected data from soup.select() is {}'.format(movie_list))
         movies = [movie.string for movie in movie_list]
