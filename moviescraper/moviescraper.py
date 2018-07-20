@@ -1,35 +1,41 @@
 #!/usr/local/bin/python3
 
+from bs4 import BeautifulSoup
+import pickle
+import logging
 import re
 import requests
-from bs4 import BeautifulSoup
-import logging
-logging.basicConfig(level=logging.INFO)
+
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-class MovieSite:
-    def __init__(self, site_url = None, theater_name = None, list_selector = None, text_search = None):
-        self.site_url = site_url
-        self.theater_name = theater_name
-        self.list_selector = list_selector
-        self.text_search = text_search
-        self.movie_list = ([])
-        self.movie_filter = ([])
+class MovieSite(object):
+    def __new__(cls, filepath=None, *args, **kwargs):
+        logging.debug('In MovieSite.__new__(), got filepath {}'.format(filepath))
+        if filepath:
+            logging.debug('Loading MovieSite instance from filepath {}'.format(filepath))
+            with open(filepath, 'rb') as theater_file:
+                instance = pickle.load(theater_file)
+        else:
+            logging.debug('Creating new MovieSite instance from scratch')
+            instance = super(MovieSite, cls).__new__(cls)
+        return instance
+
+    def __init__(self, filepath = None, site_url = None, theater_name = None, list_selector = None, text_search = None):
+        logging.debug('Initializing new MovieSite instance using specified arguments')
+        if filepath:
+            logging.debug('Skipping initialization because object was loaded from pickle')
+        else:
+            self.site_url = site_url
+            self.theater_name = theater_name
+            self.list_selector = list_selector
+            self.text_search = text_search
+            self.movie_list = ([])
+            self.movie_filter = ([])
 
     def __str__(self):
         return "\n".join(['    {}'.format(movie) for movie in self.movies()])
     
-    def _get_soup(self):
-        # Broken out to simplify testing
-        if self.site_url.startswith('http'):
-            logging.debug('Getting soup for URL {}'.format(self.site_url))
-            soup = BeautifulSoup(requests.get(self.site_url).text, 'html.parser')
-        else:
-            logging.debug('Getting soup for file path {}'.format(self.site_url))
-            with open(self.site_url) as html_file:
-                soup = BeautifulSoup(html_file, 'html.parser')
-        return soup
-
     def movies(self):
         # Only generate list if we haven't already done so
         # Doesn't currently handle cases where we have already done so but got 0 movies
@@ -61,24 +67,6 @@ class MovieSite:
         logging.debug('Completed movies() method for {}, filter is now {}'.format(self.theater_name, self.movie_filter))
         return self.movie_list
 
-    def _strip_movie_titles(self, movie_titles):
-        # Could do multiple regexes in one pass but let's start simple
-        logging.debug('Stripping titles: {}'.format(movie_titles))
-        movie_titles = [re.sub(r'^\W+', '', title) for title in movie_titles]
-        movie_titles = [re.sub(r'\W+$', '', title) for title in movie_titles]
-        movie_titles = [re.sub(r' //.*', '', title) for title in movie_titles]
-        movie_titles = [re.sub(u"\u2019", '\'', title) for title in movie_titles]
-        logging.debug('Stripped titles: {}'.format(movie_titles))
-        return movie_titles
-
-    def _filter_movie_list(self, movie_list, movie_filter):
-        # It would be more efficient to apply this only once after retrieving from all theaters
-        logging.debug('Movie list is {}'.format(movie_list))
-        logging.debug('User filter is {}'.format(movie_filter))
-        return list(filter(
-            (lambda x: any(filter_string in x for filter_string in movie_filter)), movie_list
-        ))
-
     def _generate_movie_list(self):
         logging.debug('Using list_selector {} for URL {}'.format(self.list_selector, self.site_url))
         soup = self._get_soup()
@@ -92,6 +80,41 @@ class MovieSite:
             logging.debug('Applying custom text search {}'.format(self.text_search))
             movies = re.search(self.text_search, ', '.join(movies)).group(1).split(', ')
         return movies
+
+    def _get_soup(self):
+        # Broken out to simplify testing
+        if self.site_url.startswith('http'):
+            logging.debug('Getting soup for URL {}'.format(self.site_url))
+            soup = BeautifulSoup(requests.get(self.site_url).text, 'html.parser')
+        else:
+            logging.debug('Getting soup for file path {}'.format(self.site_url))
+            with open(self.site_url) as html_file:
+                soup = BeautifulSoup(html_file, 'html.parser')
+        return soup
+
+    def _filter_movie_list(self, movie_list, movie_filter):
+        # It would be more efficient to apply this only once after retrieving from all theaters
+        logging.debug('Movie list is {}'.format(movie_list))
+        logging.debug('User filter is {}'.format(movie_filter))
+        return list(filter(
+            (lambda x: any(filter_string in x for filter_string in movie_filter)), movie_list
+        ))
+
+    def _strip_movie_titles(self, movie_titles):
+        # Could do multiple regexes in one pass but let's start simple
+        logging.debug('Stripping titles: {}'.format(movie_titles))
+        movie_titles = [re.sub(r'^\W+', '', title) for title in movie_titles]
+        movie_titles = [re.sub(r'\W+$', '', title) for title in movie_titles]
+        movie_titles = [re.sub(r' //.*', '', title) for title in movie_titles]
+        movie_titles = [re.sub(u"\u2019", '\'', title) for title in movie_titles]
+        logging.debug('Stripped titles: {}'.format(movie_titles))
+        return movie_titles
+
+    # Basic POC
+    def _save_theater_info(self, filepath):
+        logging.debug('Saving theater info to {}'.format(filepath))
+        with open(filepath, 'wb') as theater_file:
+            pickle.dump(self, theater_file)
 
 
 class Theaters:

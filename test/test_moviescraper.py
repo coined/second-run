@@ -2,20 +2,28 @@
 
 import unittest
 from unittest.mock import MagicMock
-import os
 from bs4 import BeautifulSoup
-from moviescraper import moviescraper
 import logging
+from moviescraper import moviescraper
+import os
+import shutil
+import tempfile
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TestMovieSite(unittest.TestCase):
     def setUp(self):
+        logging.debug('TEST: Creating base test theater MovieSite')
         self.test_theater = moviescraper.MovieSite(
             site_url = 'http://testtheatersite.com/', theater_name = 'Test Theater',
             list_selector = 'div#test-id > div.test-class > span',
             text_search = 'Test (.+)$'
         )
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir)
 
     def test_init(self):
         self.assertEqual(self.test_theater.site_url, 'http://testtheatersite.com/')
@@ -92,6 +100,19 @@ class TestMovieSite(unittest.TestCase):
             '  Second Sample Movie: The Return // Other Details',
             'Third Sample Movie  '
         ])
+
+    def test_save_load_theater_info(self):
+        logging.debug('TEST: Saving theater info in test_save_load_theater_info()')
+        self.test_theater._save_theater_info(os.path.join(self.test_dir, 'test_theater.p'))
+
+        logging.debug('TEST: Loading theater info in test_save_load_theater_info()')
+        test_theater_reloaded = moviescraper.MovieSite(filepath=os.path.join(self.test_dir, 'test_theater.p'))
+
+        self.assertEqual(test_theater_reloaded.site_url, 'http://testtheatersite.com/')
+        self.assertEqual(test_theater_reloaded.theater_name, 'Test Theater')
+        self.assertEqual(test_theater_reloaded.list_selector, 'div#test-id > div.test-class > span')
+        self.assertEqual(test_theater_reloaded.text_search, 'Test (.+)$')
+
 
 if __name__ == '__main__':
     unittest.main()
