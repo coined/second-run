@@ -12,10 +12,10 @@ import tempfile
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class TestMovieSite(unittest.TestCase):
+class TestTheater(unittest.TestCase):
     def setUp(self):
-        logging.debug('TEST: Creating base test theater MovieSite')
-        self.test_theater = moviescraper.MovieSite(
+        logging.debug('TEST: Creating base test theater Theater')
+        self.test_theater = moviescraper.Theater(
             site_url = 'http://testtheatersite.com/', theater_name = 'Test Theater',
             list_selector = 'div#test-id > div.test-class > span',
             text_search = 'Test (.+)$'
@@ -106,12 +106,113 @@ class TestMovieSite(unittest.TestCase):
         self.test_theater._save_theater_info(os.path.join(self.test_dir, 'test_theater.p'))
 
         logging.debug('TEST: Loading theater info in test_save_load_theater_info()')
-        test_theater_reloaded = moviescraper.MovieSite(filepath=os.path.join(self.test_dir, 'test_theater.p'))
+        test_theater_reloaded = moviescraper.Theater(filepath=os.path.join(self.test_dir, 'test_theater.p'))
 
         self.assertEqual(test_theater_reloaded.site_url, 'http://testtheatersite.com/')
         self.assertEqual(test_theater_reloaded.theater_name, 'Test Theater')
         self.assertEqual(test_theater_reloaded.list_selector, 'div#test-id > div.test-class > span')
         self.assertEqual(test_theater_reloaded.text_search, 'Test (.+)$')
+
+class TestTheaterList(unittest.TestCase):
+    def setUp(self):
+        test_theater_one = moviescraper.Theater(
+            site_url = 'http://testtheatersite1.com/',
+            theater_name = 'Test Theater One',
+            list_selector = 'div#test-id > div.test-class > span',
+        )
+        test_theater_two = moviescraper.Theater(
+            site_url = 'http://testtheatersite2.com/',
+            theater_name = 'Test Theater Two',
+            list_selector = 'div#test-id > div.test-class > span'
+        )
+        self.test_theater_list = moviescraper.TheaterList()
+        self.test_theater_list.add_theater(test_theater_one)
+        self.test_theater_list.add_theater(test_theater_two)
+
+    def test_list_theaters(self):
+        self.assertEqual(
+            self.test_theater_list.list_theaters(),
+            ['Test Theater One', 'Test Theater Two']
+        )
+
+    def test_add_theater(self):
+        self.test_theater_list.add_theater(moviescraper.Theater(
+            site_url = 'http://testtheatersite3.com/',
+            theater_name = 'Test Theater Three',
+            list_selector = 'div#test-id > div.test-class > span'
+        ))
+        self.assertEqual(
+            self.test_theater_list.list_theaters(),
+            ['Test Theater One', 'Test Theater Two', 'Test Theater Three']
+        )
+
+    def test_remove_theater(self):
+        self.test_theater_list.remove_theater(self.test_theater_list.theater_list[0])
+        self.assertEqual(
+            self.test_theater_list.list_theaters(),
+            ['Test Theater Two']
+        )
+
+    def test_init_with_config(self):
+        config = [
+            {
+                'site_url' : 'http://testtheatersite1.com/',
+                'theater_name': 'Test Theater One',
+                'list_selector' : 'div > span'
+            },
+            {
+                'site_url' : 'http://testtheatersite2.com/',
+                'theater_name': 'Test Theater Two',
+                'list_selector' : 'div > span'
+            }
+        ]
+        self.test_theater_list = moviescraper.TheaterList(config)
+        self.assertEqual(
+            self.test_theater_list.list_theaters(),
+            ['Test Theater One', 'Test Theater Two']
+        )
+        self.assertEqual(
+            self.test_theater_list.theater_list[0].site_url,
+            'http://testtheatersite1.com/'
+        )
+        self.assertEqual(
+            self.test_theater_list.theater_list[1].theater_name,
+            'Test Theater Two'
+        )
+        self.assertEqual(
+            self.test_theater_list.theater_list[1].list_selector,
+            'div > span'
+        )
+
+    def test_movies(self):
+        test_theater_one = moviescraper.Theater(
+            site_url = os.path.join(os.path.dirname(__file__), 'sample_site.html'),
+            theater_name = 'Test Theater One',
+            list_selector = 'div#test-id > div.test-class > span',
+        )
+        test_theater_two = moviescraper.Theater(
+            site_url = os.path.join(os.path.dirname(__file__), 'sample_site.html'),
+            theater_name = 'Test Theater Two',
+            list_selector = 'div#test-id > div.test-class > span',
+        )
+        self.test_theater_list = moviescraper.TheaterList()
+        self.test_theater_list.add_theater(test_theater_one)
+        self.test_theater_list.add_theater(test_theater_two)
+
+        self.assertEqual(
+            self.test_theater_list.movies(), {
+                'Test Theater One' : [
+                    'First Sample Movie',
+                    'Second Sample Movie: The Return',
+                    'Third Sample Movie'
+                ],
+                'Test Theater Two' : [
+                    'First Sample Movie',
+                    'Second Sample Movie: The Return',
+                    'Third Sample Movie'
+                ]
+            }
+        )
 
 
 if __name__ == '__main__':

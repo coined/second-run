@@ -13,8 +13,7 @@ logger = logging.getLogger(__name__)
 
 # To do:
 #
-#   * Scraping / DOM details for each theater are stored in a config file, and there's only
-#     one class for theaters (i.e. it's all in MovieSite).
+#   * Scraping / DOM details for each theater are stored in a config file.
 #   * User movie interests can be saved and loaded.
 #   * Cached movie lists from theaters, expiring after a day.
 #   * A web interface allowing multiple users.

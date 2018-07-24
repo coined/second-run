@@ -6,23 +6,27 @@ import logging
 import re
 import requests
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class MovieSite(object):
-    def __new__(cls, filepath=None, *args, **kwargs):
-        logging.debug('In MovieSite.__new__(), got filepath {}'.format(filepath))
+class Theater(object):
+    def __new__(cls, site_url = None, theater_name = None, list_selector = None, text_search = None, filepath=None):
+        logging.debug('In Theater.__new__(), got the following arguments')
+        logging.debug('\tsite_url: {}'.format(site_url))
+        logging.debug('\ttheater_name: {}'.format(theater_name))
+        logging.debug('\tlist_selector: {}'.format(list_selector))
+        logging.debug('\ttext_search: {}'.format(text_search))
+        logging.debug('\tfilepath: {}'.format(filepath))
         if filepath:
-            logging.debug('Loading MovieSite instance from filepath {}'.format(filepath))
+            logging.debug('Loading Theater instance from filepath {}'.format(filepath))
             with open(filepath, 'rb') as theater_file:
                 instance = pickle.load(theater_file)
         else:
-            logging.debug('Creating new MovieSite instance from scratch')
-            instance = super(MovieSite, cls).__new__(cls)
+            logging.debug('Creating new Theater instance from scratch')
+            instance = super(Theater, cls).__new__(cls)
         return instance
 
-    def __init__(self, filepath = None, site_url = None, theater_name = None, list_selector = None, text_search = None):
-        logging.debug('Initializing new MovieSite instance using specified arguments')
+    def __init__(self, site_url = None, theater_name = None, list_selector = None, text_search = None, filepath=None):
         if filepath:
             logging.debug('Skipping initialization because object was loaded from pickle')
         else:
@@ -119,28 +123,28 @@ class MovieSite(object):
 
 class Theaters:
     def __init__(self):
-        laurelhurst_theater = MovieSite(
+        laurelhurst_theater = Theater(
             site_url = 'http://laurelhursttheater.com/', theater_name = 'Laurelhurst',
             list_selector = 'div.movieListing_titleContainer > span.movieListing_title > a'
         )
-        lake_theater = MovieSite(
+        lake_theater = Theater(
             site_url = 'http://laketheatercafe.com/', theater_name = 'Lake Theater',
             list_selector = 'section#nowplaying > div.section-inner > div.section-content > p > span',
             text_search = 'Now Playing: (.+)$'
         )
-        academy_theater = MovieSite(
+        academy_theater = Theater(
             site_url = 'http://www.academytheaterpdx.com/', theater_name = 'Academy Theater',
             list_selector = 'div.now_playing > section.board > ul > li > a'
         )
-        livingroom_theater = MovieSite(
+        livingroom_theater = Theater(
             site_url = 'http://pdx.livingroomtheaters.com/', theater_name = 'Living Room Theaters',
             list_selector = 'ul.movie_titles > li > a'
         )
-        wunderland_theater = MovieSite(
+        wunderland_theater = Theater(
             site_url = 'http://www.wunderlandgames.com/gettimes.asp?house=3054',
             theater_name = 'Milwaukie Wunderland Cinema', list_selector = 'a.a1title > b'
         )
-        moreland_theater = MovieSite(
+        moreland_theater = Theater(
             site_url = 'https://ticketing.us.veezi.com/sessions/?siteToken=v0v9bscth4zdgv6ezczt5ecsjm',
             theater_name = 'Moreland Theater',
             list_selector = 'div#sessionsByFilmConent > div.film > div > h3.title'
@@ -150,4 +154,32 @@ class Theaters:
 
     def theater_list(self):
         return self.theaters
+
+
+class TheaterList(object):
+    def __init__(self, config = None):
+        logging.debug('Initializing new TheaterList instance')
+        self.theater_list = []
+        if config:
+            logging.debug('Loading theater list from config: {}'.format(config))
+            for theater_info in config:
+                logging.debug('Loading a theater with theater info {}'.format(theater_info))
+                theater = Theater(**theater_info)
+                self.add_theater(theater)
+
+    def add_theater(self, theater):
+        self.theater_list.append(theater)
+
+    def remove_theater(self, theater):
+        if theater in self.theater_list:
+            self.theater_list.remove(theater)
+
+    def list_theaters(self):
+        return [ theater.theater_name for theater in self.theater_list ]
+
+    def movies(self):
+        movies = {}
+        for theater in self.theater_list:
+            movies[theater.theater_name] = theater.movies()
+        return movies
 
